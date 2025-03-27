@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
+from django.contrib import messages
 from django.db.models import Sum, F
 from django.forms import inlineformset_factory
 from .models import Order, Product, ProductCategory, OrderItem
@@ -18,20 +19,20 @@ def create_order(request):
             formset = OrderItemFormSet(request.POST, instance=order)
             if form.is_valid() and formset.is_valid():
                 order = form.save()
-                # Save formset and handle deletions
                 instances = formset.save(commit=False)
-                # Handle deletions
                 for obj in formset.deleted_objects:
                     obj.delete()
-                # Save new and modified instances
                 for instance in instances:
                     instance.order = order
                     if not instance.item_price and instance.product:
                         instance.item_price = instance.product.price
                     instance.save()
                 formset.save_m2m()
-                order.calculate_total()  # Calculate total after all items are saved
+                order.calculate_total()
+                messages.success(request, 'Order updated successfully!')
                 return redirect('order_list')
+            else:
+                messages.error(request, 'Please correct the errors below.')
         else:
             form = OrderForm(instance=order)
             formset = OrderItemFormSet(instance=order)
@@ -47,8 +48,11 @@ def create_order(request):
                     if not instance.item_price and instance.product:
                         instance.item_price = instance.product.price
                     instance.save()
-                order.calculate_total()  # Calculate total after all items are saved
+                order.calculate_total()
+                messages.success(request, 'Order created successfully!')
                 return redirect('order_list')
+            else:
+                messages.error(request, 'Please correct the errors below.')
         else:
             form = OrderForm()
             formset = OrderItemFormSet()
@@ -74,22 +78,35 @@ def create_category(request):
     if request.method == 'POST':
         name = request.POST.get('name')
         description = request.POST.get('description')
-        ProductCategory.objects.create(name=name, description=description)
+        if name:
+            ProductCategory.objects.create(name=name, description=description)
+            messages.success(request, 'Category created successfully!')
+        else:
+            messages.error(request, 'Category name is required.')
         return redirect('category_list')
     return redirect('category_list')
 
 def edit_category(request, category_id):
     if request.method == 'POST':
         category = get_object_or_404(ProductCategory, id=category_id)
-        category.name = request.POST.get('name')
-        category.description = request.POST.get('description')
-        category.save()
+        name = request.POST.get('name')
+        if name:
+            category.name = name
+            category.description = request.POST.get('description')
+            category.save()
+            messages.success(request, 'Category updated successfully!')
+        else:
+            messages.error(request, 'Category name is required.')
     return redirect('category_list')
 
 def delete_category(request, category_id):
     if request.method == 'POST':
         category = get_object_or_404(ProductCategory, id=category_id)
-        category.delete()
+        try:
+            category.delete()
+            messages.success(request, 'Category deleted successfully!')
+        except Exception as e:
+            messages.error(request, 'Cannot delete category. It may have associated products.')
     return redirect('category_list')
 
 # Product Views
@@ -106,35 +123,62 @@ def create_product(request):
         name = request.POST.get('name')
         price = request.POST.get('price')
         category_id = request.POST.get('category')
-        category = get_object_or_404(ProductCategory, id=category_id)
-        Product.objects.create(
-            name=name,
-            price=price,
-            category=category
-        )
+        
+        if name and price and category_id:
+            try:
+                category = get_object_or_404(ProductCategory, id=category_id)
+                Product.objects.create(
+                    name=name,
+                    price=price,
+                    category=category
+                )
+                messages.success(request, 'Product created successfully!')
+            except Exception as e:
+                messages.error(request, str(e))
+        else:
+            messages.error(request, 'All fields are required.')
         return redirect('product_list')
     return redirect('product_list')
 
 def edit_product(request, product_id):
     if request.method == 'POST':
         product = get_object_or_404(Product, id=product_id)
-        product.name = request.POST.get('name')
-        product.price = request.POST.get('price')
+        name = request.POST.get('name')
+        price = request.POST.get('price')
         category_id = request.POST.get('category')
-        product.category = get_object_or_404(ProductCategory, id=category_id)
-        product.save()
+        
+        if name and price and category_id:
+            try:
+                category = get_object_or_404(ProductCategory, id=category_id)
+                product.name = name
+                product.price = price
+                product.category = category
+                product.save()
+                messages.success(request, 'Product updated successfully!')
+            except Exception as e:
+                messages.error(request, str(e))
+        else:
+            messages.error(request, 'All fields are required.')
     return redirect('product_list')
 
 def delete_product(request, product_id):
     if request.method == 'POST':
         product = get_object_or_404(Product, id=product_id)
-        product.delete()
+        try:
+            product.delete()
+            messages.success(request, 'Product deleted successfully!')
+        except Exception as e:
+            messages.error(request, 'Cannot delete product. It may be used in orders.')
     return redirect('product_list')
 
 def delete_order(request, order_id):
     if request.method == 'POST':
         order = get_object_or_404(Order, id=order_id)
-        order.delete()
+        try:
+            order.delete()
+            messages.success(request, 'Order deleted successfully!')
+        except Exception as e:
+            messages.error(request, str(e))
     return redirect('order_list')
 
 # Create OrderItemFormSet

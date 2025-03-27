@@ -58,6 +58,18 @@ TEMPLATES = [
     },
 ]
 
+# Message framework settings
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
+
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.DEBUG: 'info',
+    messages.INFO: 'info',
+    messages.SUCCESS: 'success',
+    messages.WARNING: 'warning',
+    messages.ERROR: 'error',
+}
+
 WSGI_APPLICATION = "orderapp.wsgi.application"
 
 DATABASES = {
