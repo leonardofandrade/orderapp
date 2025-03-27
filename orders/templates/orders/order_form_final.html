@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>{% if is_edit %}Edit{% else %}Create{% endif %} Order</h2>
+    <form method="post" class="mb-4">
+        {% csrf_token %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Customer Information</h5>
+            </div>
+            <div class="card-body">
+                {{ form.as_p }}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Order Items</h5>
+                <button type="button" id="add-item" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add Item
+                </button>
+            </div>
+            <div class="card-body">
+                {{ formset.management_form }}
+                <table class="table" id="items-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Subtotal</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form in formset %}
+                            <tr class="item-row">
+                                <td>
+                                    {{ form.id }}
+                                    {{ form.product }}
+                                </td>
+                                <td>{{ form.quantity }}</td>
+                                <td>{{ form.item_price }}</td>
+                                <td class="subtotal">$0.00</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <button type="button" class="btn btn-danger btn-sm remove-item">
+                                            <i class="fas fa-trash"></i> Remove
+                                        </button>
+                                        <div class="delete-checkbox ml-2" style="display:none;">
+                                            {{ form.DELETE }}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-right"><strong>Total:</strong></td>
+                            <td id="total-amount">$0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-save"></i> Save Order
+            </button>
+            <a href="{% url 'order_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    var formsetPrefix = "{{ formset.prefix }}";
+    var totalForms = $("#id_" + formsetPrefix + "-TOTAL_FORMS");
+    
+    // Initialize Select2 for all product dropdowns
+    function initializeSelect2() {
+        $('.select2').select2({
+            theme: 'bootstrap4',
+            width: '100%'
+        });
+    }
+
+    // Calculate subtotal for a row
+    function calculateSubtotal(row) {
+        var quantity = parseFloat(row.find('input[name$="-quantity"]').val()) || 0;
+        var price = parseFloat(row.find('input[name$="-item_price"]').val()) || 0;
+        var subtotal = quantity * price;
+        row.find('.subtotal').text('$' + subtotal.toFixed(2));
+        return subtotal;
+    }
+
+    // Calculate total for all rows
+    function calculateTotal() {
+        var total = 0;
+        $('.item-row:visible').each(function() {
+            total += calculateSubtotal($(this));
+        });
+        $('#total-amount').text('$' + total.toFixed(2));
+    }
+
+    // Update price when product changes
+    function updatePrice(row) {
+        var productSelect = row.find('select[name$="-product"]');
+        var priceInput = row.find('input[name$="-item_price"]');
+        
+        if (productSelect.val()) {
+            $.get('/api/product/' + productSelect.val() + '/price/', function(data) {
+                priceInput.val(data.price);
+                calculateSubtotal(row);
+                calculateTotal();
+            });
+        } else {
+            priceInput.val('');
+            calculateSubtotal(row);
+            calculateTotal();
+        }
+    }
+    
+    // Add new item row
+    $("#add-item").click(function() {
+        var currentForms = parseInt(totalForms.val());
+        var row = $(".item-row:first").clone(true);
+        
+        // Update form index
+        row.find(":input").each(function() {
+            var name = $(this).attr('name');
+            if (name) {
+                name = name.replace('-0-', '-' + currentForms + '-');
+                $(this).attr('name', name);
+                $(this).attr('id', 'id_' + name);
+            }
+        });
+        
+        // Clear values
+        row.find("input[type='number']").val('');
+        row.find("select").val('').trigger('change');
+        row.find("input[type='checkbox']").prop('checked', false);
+        row.find('.subtotal').text('$0.00');
+        
+        // Add new row to table
+        $("#items-table tbody").append(row);
+        
+        // Update total forms
+        totalForms.val(currentForms + 1);
+        
+        // Reinitialize Select2
+        initializeSelect2();
+    });
+    
+    // Remove item row
+    $(".remove-item").click(function() {
+        var row = $(this).closest('tr');
+        if ($(".item-row:visible").length > 1) {
+            var deleteCheckbox = row.find("input[type='checkbox'][name$='-DELETE']");
+            if (deleteCheckbox.length) {
+                deleteCheckbox.prop('checked', true);
+                row.hide();
+            } else {
+                row.remove();
+                totalForms.val(parseInt(totalForms.val()) - 1);
+            }
+            calculateTotal();
+        } else {
+            alert("You cannot remove all items. At least one item is required.");
+        }
+    });
+
+    // Update calculations when quantity or price changes
+    $(document).on('change', 'input[name$="-quantity"], input[name$="-item_price"]', function() {
+        calculateSubtotal($(this).closest('tr'));
+        calculateTotal();
+    });
+
+    // Update price when product changes
+    $(document).on('change', 'select[name$="-product"]', function() {
+        updatePrice($(this).closest('tr'));
+    });
+    
+    // Initialize Select2 and calculate initial totals
+    initializeSelect2();
+    calculateTotal();
+
+    // Initialize prices for existing rows
+    $('.item-row').each(function() {
+        var row = $(this);
+        if (row.find('select[name$="-product"]').val()) {
+            updatePrice(row);
+        }
+    });
+});
+</script>
+{% endblock %}

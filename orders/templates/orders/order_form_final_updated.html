@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Create Order</h2>
+<form method="post" class="mb-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    {{ formset.management_form }}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Item Price</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ formset.non_form_errors }}
+            {% for form in formset %}
+                <tr>
+                    <td>{{ form.product.label }}: {{ form.product }}</td>
+                    <td>{{ form.quantity.label }}: {{ form.quantity }}</td>
+                    <td>{{ form.item_price.label }}: {{ form.item_price }}</td>
+                    <td><button type="button" class="remove-item btn btn-danger">Remove</button></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="button" id="add-item" class="btn btn-primary">Add Item</button>
+    <button type="submit" class="btn btn-success">Submit Order</button>
+    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#productModal">Add New Product</button>
+</form>
+
+<!-- Modal for Adding New Product -->
+<div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="productModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="productModalLabel">Add New Product</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="newProductForm" method="post" action="{% url 'create_product' %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="productName">Product Name</label>
+                        <input type="text" class="form-control" id="productName" name="productName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productPrice">Product Price</label>
+                        <input type="number" class="form-control" id="productPrice" name="productPrice" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productCategory">Product Category</label>
+                        <select class="form-control" id="productCategory" name="productCategory" required>
+                            {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('.select2').select2();
+
+        // Handle the new product form submission
+        $('#newProductForm').on('submit', function(event) {
+            event.preventDefault(); // Prevent default form submission
+            $.ajax({
+                type: 'POST',
+                url: $(this).attr('action'),
+                data: $(this).serialize(),
+                success: function(response) {
+                    // Optionally, you can update the product dropdown or show a success message
+                    $('#productModal').modal('hide'); // Hide the modal
+                    alert('Product added successfully!'); // Show success message
+                },
+                error: function(response) {
+                    alert('Error adding product. Please try again.'); // Show error message
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

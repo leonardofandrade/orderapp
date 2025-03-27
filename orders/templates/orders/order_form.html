@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Create Order</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    {{ formset.management_form }}
+    <table>
+        {{ formset.non_form_errors }}
+        {% for form in formset %}
+            <tr>
+                <td>{{ form.product.label }}: {{ form.product }}</td>
+                <td>{{ form.quantity.label }}: {{ form.quantity }}</td>
+                <td>{{ form.item_price.label }}: {{ form.item_price }}</td>
+                <td><button type="button" class="remove-item">Remove</button></td>
+            </tr>
+        {% endfor %}
+    </table>
+    <button type="button" id="add-item">Add Item</button>
+    <button type="submit">Submit Order</button>
+</form>
+{% endblock %}
